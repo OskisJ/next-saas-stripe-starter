@@ -115,6 +115,255 @@ https://github.com/mickasmt/next-saas-stripe-starter/assets/62285783/828a4e0f-30
 
 - [Vercel Analytics](https://vercel.com/analytics) – Track unique visitors, pageviews, and more in a privacy-friendly way
 
+## Stock Dashboard Feature
+
+Production-ready stock dashboard with real-time data from Finnhub API, featuring comprehensive technical analysis, social sentiment tracking, and analyst consensus.
+
+### Features
+
+- **Real-time Stock Data** – Company profiles, fundamentals, and live price updates
+- **Technical Analysis** – MACD indicator with configurable parameters (12,26,9)
+- **Social Sentiment** – Track social media sentiment and mentions over time
+- **Analyst Consensus** – View analyst ratings and price targets
+- **Interactive Charts** – Built with Recharts, featuring zoom, tooltips, and export functionality
+- **Redis Caching** – Intelligent caching with configurable TTLs (5-30 minutes)
+- **Error Handling** – Retry logic with exponential backoff and circuit breaker pattern
+- **Mock Mode** – Develop without API key using canned data
+- **Docker Ready** – Complete Docker and docker-compose configuration
+- **Fully Tested** – Unit tests with Vitest (80%+ coverage goal)
+
+### Quick Start
+
+#### 1. Get Finnhub API Key
+
+Sign up at [Finnhub.io](https://finnhub.io/register) to get your free API key.
+
+#### 2. Configure Environment Variables
+
+Add to your `.env.local`:
+
+```bash
+# Stock Dashboard
+FINNHUB_API_KEY=your_finnhub_api_key_here
+REDIS_URL=redis://localhost:6379  # Optional
+NODE_ENV=development
+```
+
+#### 3. Start Redis (Optional but Recommended)
+
+Using Docker:
+
+```bash
+docker run -d -p 6379:6379 redis:7-alpine
+```
+
+Or with docker-compose:
+
+```bash
+docker-compose up -d redis postgres
+```
+
+#### 4. Run the Development Server
+
+```bash
+npm run dev
+```
+
+Visit [http://localhost:3000/company/AAPL](http://localhost:3000/company/AAPL) to see the dashboard.
+
+### Mock Mode
+
+For development without an API key:
+
+```bash
+FINNHUB_API_KEY=mock
+```
+
+This uses canned data for all API calls.
+
+### API Endpoints
+
+#### GET /api/company?symbol=AAPL
+
+Returns comprehensive company data including profile, fundamentals, prices, MACD, and sentiment.
+
+**Response:**
+
+```json
+{
+  "profile": { "symbol": "AAPL", "name": "Apple Inc.", ... },
+  "fundamentals": { "pe": 28.5, "eps": 6.15, ... },
+  "analystConsensus": { "rating": "Buy", "buy": 25, "hold": 8, "sell": 2 },
+  "prices": { "timestamps": [...], "close": [...], ... },
+  "macd": { "macd": [...], "signal": [...], "histogram": [...] },
+  "socialSentiment": { "timestamps": [...], "score": [...], "mentions": [...] },
+  "meta": { "cached": true, "stale": false, "fetchedAt": "..." }
+}
+```
+
+#### GET /api/prices?symbol=AAPL&range=1M&resolution=D
+
+Returns historical price data with flexible time ranges (1D, 5D, 1M, 3M, 6M, 1Y, 5Y).
+
+#### GET /api/sentiment?symbol=AAPL&range=1M
+
+Returns social sentiment data. Falls back to simulated data if unavailable.
+
+### Caching Strategy
+
+Redis caching with intelligent TTLs:
+
+| Data Type          | TTL        | Reason                    |
+| ------------------ | ---------- | ------------------------- |
+| Company Profile    | 30 minutes | Rarely changes            |
+| Fundamentals       | 30 minutes | Quarterly updates         |
+| Analyst Consensus  | 30 minutes | Infrequent updates        |
+| Stock Prices       | 5 minutes  | Balance freshness & limits|
+| Social Sentiment   | 5 minutes  | More dynamic data         |
+
+### Error Handling
+
+- **Retry Logic**: 3 attempts with exponential backoff (100ms, 200ms, 400ms)
+- **Circuit Breaker**: After 5 consecutive failures, serves stale cache for 5 minutes
+- **Graceful Degradation**: Works without Redis (no-cache mode)
+- **User-Friendly Messages**: Technical errors translated to helpful messages
+
+### MACD Calculation
+
+Server-side calculation using Exponential Moving Averages (EMA):
+
+```
+1. Fast EMA (12 periods) of close prices
+2. Slow EMA (26 periods) of close prices
+3. MACD Line = Fast EMA - Slow EMA
+4. Signal Line = EMA (9 periods) of MACD Line
+5. Histogram = MACD Line - Signal Line
+```
+
+**Formula:**
+```
+Multiplier = 2 / (period + 1)
+EMA[today] = (close[today] - EMA[yesterday]) * multiplier + EMA[yesterday]
+EMA[first] = SMA of first 'period' values
+```
+
+### Testing
+
+Run all tests:
+
+```bash
+npm test
+```
+
+Watch mode:
+
+```bash
+npm run test:watch
+```
+
+Coverage report:
+
+```bash
+npm run test:coverage
+```
+
+### Docker Deployment
+
+#### Build Image
+
+```bash
+docker build -t stock-dashboard .
+```
+
+#### Run with Docker Compose
+
+```bash
+docker-compose up -d
+```
+
+Services:
+- **App**: http://localhost:3000
+- **Redis**: localhost:6379
+- **PostgreSQL**: localhost:5432
+
+### Architecture
+
+```
+Frontend (Next.js + React)
+  ↓
+API Routes (Next.js Server)
+  ↓
+Redis Cache Layer (with circuit breaker)
+  ↓
+Finnhub API Client (with retry logic)
+  ↓
+Finnhub API
+```
+
+### File Structure
+
+```
+lib/
+  ├── finnhub.ts              # Finnhub API client
+  ├── finnhub-mock-data.ts    # Mock data for development
+  ├── redis.ts                # Redis cache client
+  ├── stockUtils.ts           # MACD/EMA calculations
+  ├── chartUtils.ts           # Chart data transformations
+  └── validations/stock.ts    # Zod schemas
+
+app/api/
+  ├── company/route.ts        # Company data endpoint
+  ├── prices/route.ts         # Historical prices endpoint
+  └── sentiment/route.ts      # Social sentiment endpoint
+
+app/(protected)/company/[symbol]/
+  ├── page.tsx                # Main dashboard page
+  ├── loading.tsx             # Loading state
+  └── error.tsx               # Error boundary
+
+components/stock/
+  ├── company-header.tsx      # Company profile header
+  ├── fundamentals-panel.tsx  # Key metrics display
+  ├── price-chart.tsx         # Stock price chart
+  ├── macd-chart.tsx          # MACD indicator chart
+  ├── sentiment-chart.tsx     # Social sentiment chart
+  ├── comparison-chart.tsx    # MACD vs sentiment overlay
+  ├── analyst-panel.tsx       # Analyst consensus
+  ├── ticker-search.tsx       # Ticker symbol search
+  ├── chart-export-button.tsx # CSV/PNG export
+  └── error-message.tsx       # Friendly error display
+```
+
+### Troubleshooting
+
+#### "Finnhub API rate limit exceeded"
+
+Wait 60 seconds or use cached data. Consider upgrading your Finnhub plan.
+
+#### "Redis connection failed"
+
+Check Redis is running:
+
+```bash
+redis-cli ping  # Should return "PONG"
+```
+
+The app will work in no-cache mode if Redis is unavailable.
+
+#### "Invalid ticker symbol"
+
+Ensure symbol is 1-5 uppercase letters (e.g., "AAPL", "MSFT", "GOOGL").
+
+### Contributing
+
+When adding new features:
+
+1. Run tests before committing
+2. Follow TypeScript strict mode
+3. Add tests for new functionality
+4. Update documentation
+5. Ensure ESLint and Prettier pass
+
 ## Author
 
 Created by [@miickasmt](https://twitter.com/miickasmt) in 2023, released under the [MIT license](https://github.com/shadcn/taxonomy/blob/main/LICENSE.md).
