@@ -15,6 +15,10 @@ export const env = createEnv({
     EMAIL_FROM: z.string().min(1),
     STRIPE_API_KEY: z.string().min(1),
     STRIPE_WEBHOOK_SECRET: z.string().min(1),
+    // Stock Dashboard
+    FINNHUB_API_KEY: z.string().min(1),
+    REDIS_URL: z.string().url().optional(),
+    NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   },
   client: {
     NEXT_PUBLIC_APP_URL: z.string().min(1),
