@@ -3,7 +3,7 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 
 # Install dependencies
-COPY package.json ./
+COPY package.json package-lock.json ./
 RUN npm ci --only=production && npm cache clean --force
 
 # Stage 2: Builder
@@ -11,7 +11,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Copy dependencies and source
-COPY package.json ./
+COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 
